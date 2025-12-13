@@ -36,14 +36,18 @@ def get_next_job_number(client_code):
 @app.route('/triage', methods=['POST'])
 def triage():
     try:
-        data = request.get_json()
-        email_content = data.get('emailContent', '')
+        # Accept both JSON and plain text
+        if request.is_json:
+            data = request.get_json()
+            email_content = data.get('emailContent', '')
+        else:
+            email_content = request.get_data(as_text=True)
         
         if not email_content:
             return jsonify({'error': 'No email content provided'}), 400
         
         response = client.messages.create(
-model='claude-sonnet-4-20250514',
+            model='claude-sonnet-4-20250514',
             max_tokens=2000,
             temperature=0.2,
             system=DOT_PROMPT,

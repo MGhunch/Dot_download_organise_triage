@@ -1,2 +1,2 @@
 # Dot_download_organise_triage
-Download, organise and triage projects.
+Purpose is to connect dots between Open Ai, Microsoft world and more.

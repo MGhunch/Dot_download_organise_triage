@@ -27,6 +27,7 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "clientName": "[Client business name]",
   "projectOwner": "[Client contact name or 'TBC']",
   "jobName": "[Shortest recognisable project name - no descriptors]",
+  "jobsummary:" [Short description that explains the job]", 
   "objective": "[What client hopes to achieve, or 'TBC']",
   "hunchAsk": "[Specific work requested from Hunch]",
   "nextAction": "[What needs to happen next - usually meeting or task, or 'TBC']",
@@ -35,34 +36,35 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "what": "[What they need to understand/do]",
   "why": "[Why they'll care / what's in it for them]",
   "questions": ["[Question 1]", "[Question 2]"],
-  "emailBody": "[Formatted plain text - see template]"
+  "emailBody": "[Formatted HTML - see template]"
 }
 
-TEMPLATE FOR emailBody:
-**Client:** [clientName]
-**Project Owner:** [projectOwner]
-**Job Name:** [jobName]
-**Objective:** [objective]
-**Live date:** [liveDate]
-
-**THE JOB - What needs to be done?**
-**Hunch ask:** [hunchAsk]
-**Next action:** [nextAction]
-
-**THE CUSTOMER - Why will anyone care?**
-**Who:** [who]
-**What:** [what]
-**Why:** [why]
-
-**QUESTIONS:**
-- [questions as bullets, or omit section if empty]
-
-**NEXT UP, HUMANS.**
-Dot captures current known facts and flags gaps. Scope and insight may change once the humans dig in.
+TEMPLATE FOR emailBody (use HTML formatting):
+<b>Client:</b> [clientName]<br>
+<b>Project Owner:</b> [projectOwner]<br>
+<b>Job Name:</b> [jobName]<br>
+<b>Summary:</b> [jobsummary]<br>
+<b>Objective:</b> [objective]<br>
+<b>Live date:</b> [liveDate]<br>
+<br>
+<b>THE JOB - What needs to be done?</b><br>
+<b>Hunch ask:</b> [hunchAsk]<br>
+<b>Next action:</b> [nextAction]<br>
+<br>
+<b>THE CUSTOMER - Why will anyone care?</b><br>
+<b>Who:</b> [who]<br>
+<b>What:</b> [what]<br>
+<b>Why:</b> [why]<br>
+<br>
+<b>QUESTIONS:</b><br>
+[questions as bullet points using • character, or omit section if empty]<br>
+<br>
+<b>WHAT NEXT?.</b><br>
+Dot only captures current known facts and flags gaps. Scope and insight may change once the humans dig in.
 
 RULES:
 - Max 12 words per line (except Why: ~20 words)
 - Only ask 1-3 questions that unlock progress
 - Do not invent facts or infer identity/scope/timing
 - Prefer saying less to saying something uncertain
-- Use **bold** for all field labels and section headers in emailBody
+- Use HTML tags for formatting: <b> for bold, <br> for line breaks

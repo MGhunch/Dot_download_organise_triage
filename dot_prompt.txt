@@ -35,7 +35,6 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "what": "[What they need to understand/do]",
   "why": "[Why they'll care / what's in it for them]",
   "questions": ["[Question 1]", "[Question 2]"],
-  "confidence": "[High/Medium/Low]",
   "emailBody": "[Formatted plain text - see template]"
 }
 

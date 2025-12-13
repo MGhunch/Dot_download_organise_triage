@@ -1,13 +1,23 @@
 from flask import Flask, request, jsonify
 from anthropic import Anthropic
+import httpx
 import json
 import os
 import requests
 
 app = Flask(__name__)
 
-# Initialize Anthropic client
-client = Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+# Initialize Anthropic client with custom httpx client (no proxy support)
+# This prevents Railway's proxy settings from breaking the client
+custom_http_client = httpx.Client(
+    timeout=30.0,
+    follow_redirects=True
+)
+
+client = Anthropic(
+    api_key=os.environ.get('ANTHROPIC_API_KEY'),
+    http_client=custom_http_client
+)
 
 # Load DOT prompt from file
 with open('dot_prompt.txt', 'r') as f:
@@ -53,12 +63,12 @@ def triage():
         content = response.content[0].text
         analysis = json.loads(content)
         
-        # Get job number if not HUN
-        client_code = analysis.get('clientCode', 'HUN')
-        if client_code != 'HUN':
+        # Get job number if not HUN or TBC
+        client_code = analysis.get('clientCode', 'TBC')
+        if client_code not in ['HUN', 'TBC']:
             job_number = get_next_job_number(client_code)
         else:
-            job_number = 'HUN TBC'
+            job_number = f'{client_code} TBC'
         
         # Return complete analysis
         return jsonify({
@@ -91,3 +101,5 @@ def health():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
+```
+

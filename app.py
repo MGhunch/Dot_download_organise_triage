@@ -1,13 +1,13 @@
 from flask import Flask, request, jsonify
-from openai import OpenAI
+from anthropic import Anthropic
 import json
 import os
 import requests
 
 app = Flask(__name__)
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+# Initialize Anthropic client
+client = Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
 
 # Load DOT prompt from file
 with open('dot_prompt.txt', 'r') as f:
@@ -38,18 +38,19 @@ def triage():
         if not email_content:
             return jsonify({'error': 'No email content provided'}), 400
         
-        # Call ChatGPT with DOT prompt
-        response = client.chat.completions.create(
-            model='gpt-3.5-turbo',
+        # Call Claude with DOT prompt
+        response = client.messages.create(
+            model='claude-3-5-sonnet-20241022',
+            max_tokens=2000,
             temperature=0.2,
+            system=DOT_PROMPT,
             messages=[
-                {'role': 'system', 'content': DOT_PROMPT},
                 {'role': 'user', 'content': f'Email content:\n\n{email_content}'}
             ]
         )
         
-        # Parse ChatGPT's JSON response
-        content = response.choices[0].message.content
+        # Parse Claude's JSON response
+        content = response.content[0].text
         analysis = json.loads(content)
         
         # Get job number if not HUN
@@ -72,7 +73,7 @@ def triage():
         
     except json.JSONDecodeError as e:
         return jsonify({
-            'error': 'ChatGPT returned invalid JSON',
+            'error': 'Claude returned invalid JSON',
             'details': str(e),
             'raw_response': content
         }), 500

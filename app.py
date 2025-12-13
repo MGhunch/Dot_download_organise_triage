@@ -7,8 +7,6 @@ import requests
 
 app = Flask(__name__)
 
-# Initialize Anthropic client with custom httpx client (no proxy support)
-# This prevents Railway's proxy settings from breaking the client
 custom_http_client = httpx.Client(
     timeout=30.0,
     follow_redirects=True
@@ -19,12 +17,10 @@ client = Anthropic(
     http_client=custom_http_client
 )
 
-# Load DOT prompt from file
 with open('dot_prompt.txt', 'r') as f:
     DOT_PROMPT = f.read()
 
 def get_next_job_number(client_code):
-    """Call Google Apps Script to get next job number"""
     try:
         url = os.environ.get('GOOGLE_SCRIPT_URL')
         response = requests.get(url, params={
@@ -39,16 +35,13 @@ def get_next_job_number(client_code):
 
 @app.route('/triage', methods=['POST'])
 def triage():
-    """Main triage endpoint"""
     try:
-        # Get email content from request
         data = request.get_json()
         email_content = data.get('emailContent', '')
         
         if not email_content:
             return jsonify({'error': 'No email content provided'}), 400
         
-        # Call Claude with DOT prompt
         response = client.messages.create(
             model='claude-3-5-sonnet-20241022',
             max_tokens=2000,
@@ -59,18 +52,15 @@ def triage():
             ]
         )
         
-        # Parse Claude's JSON response
         content = response.content[0].text
         analysis = json.loads(content)
         
-        # Get job number if not HUN or TBC
         client_code = analysis.get('clientCode', 'TBC')
         if client_code not in ['HUN', 'TBC']:
             job_number = get_next_job_number(client_code)
         else:
             job_number = f'{client_code} TBC'
         
-        # Return complete analysis
         return jsonify({
             'jobNumber': job_number,
             'jobName': analysis.get('jobName', 'Untitled'),
@@ -95,11 +85,8 @@ def triage():
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint"""
     return jsonify({'status': 'healthy', 'service': 'Dot Triage'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
-```
-

@@ -16,8 +16,62 @@ client = Anthropic(
     http_client=custom_http_client
 )
 
+# Airtable config
+AIRTABLE_API_KEY = os.environ.get('AIRTABLE_API_KEY')
+AIRTABLE_BASE_ID = 'app8CI7NAZqhQ4G1Y'
+AIRTABLE_TABLE_NAME = 'Job Numbers'
+
 with open('dot_prompt.txt', 'r') as f:
     DOT_PROMPT = f.read()
+
+def get_next_job_number(client_code):
+    """Look up client in Airtable, increment job number, return formatted string"""
+    if not AIRTABLE_API_KEY:
+        print("No Airtable API key configured")
+        return f"{client_code} TBC"
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {AIRTABLE_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Search for the client code
+        search_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE_NAME}"
+        params = {'filterByFormula': f"{{Client code}}='{client_code}'"}
+        
+        response = httpx.get(search_url, headers=headers, params=params, timeout=10.0)
+        response.raise_for_status()
+        
+        records = response.json().get('records', [])
+        
+        if not records:
+            print(f"Client code '{client_code}' not found in Airtable")
+            return f"{client_code} TBC"
+        
+        record = records[0]
+        record_id = record['id']
+        fields = record['fields']
+        
+        current_number = fields.get('Next #', 1)
+        next_number = current_number + 1
+        
+        # Format job number (e.g., "TOW 023")
+        job_number = f"{client_code} {str(current_number).zfill(3)}"
+        
+        # Update Airtable with incremented number
+        update_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE_NAME}/{record_id}"
+        update_data = {'fields': {'Next #': next_number}}
+        
+        update_response = httpx.patch(update_url, headers=headers, json=update_data, timeout=10.0)
+        update_response.raise_for_status()
+        
+        print(f"Job number assigned: {job_number}, next will be {next_number}")
+        return job_number
+        
+    except Exception as e:
+        print(f"Airtable error: {e}")
+        return f"{client_code} TBC"
 
 @app.route('/triage', methods=['POST'])
 def triage():
@@ -71,9 +125,17 @@ def triage():
         
         analysis = json.loads(content)
         
+        # Get job number from Airtable
+        client_code = analysis.get('clientCode', 'TBC')
+        if client_code and client_code != 'TBC':
+            job_number = get_next_job_number(client_code)
+        else:
+            job_number = 'TBC'
+        
         # Return analysis
         return jsonify({
-            'clientCode': analysis.get('clientCode', 'TBC'),
+            'jobNumber': job_number,
+            'clientCode': client_code,
             'clientName': analysis.get('clientName', ''),
             'projectOwner': analysis.get('projectOwner', ''),
             'jobName': analysis.get('jobName', 'Untitled'),

@@ -49,20 +49,20 @@ FOR "THE CUSTOMER" SECTION:
 TEMPLATE FOR emailBody (use HTML formatting):
 <div style="font-family: Calibri, sans-serif; font-size: 11px; line-height: 1.4;">
 
-<b style="font-size: 13px;">DOT TRIAGE</b><br><br>
+<b style="font-size: 13px; color: #ED1C24;">DOT TRIAGE</b><br><br>
 
 <b>Client:</b> [clientName]<br>
 <b>Project Owner:</b> [projectOwner]<br>
 <b>Job Name:</b> [jobName]<br>
-<b>Summary:</b> [jobSummary]<br>
 <b>Live date:</b> [liveDate]<br><br>
 
-<b style="font-size: 12px;">THE JOB - What needs to be done?</b><br>
+<b style="font-size: 12px; color: #ED1C24;">THE JOB - What needs to be done?</b><br>
+<b>Summary:</b> [jobSummary]<br>
 <b>Business goal:</b> [objective]<br>
 <b>Hunch ask:</b> [hunchAsk]<br>
 <b>Next action:</b> [nextAction]<br><br>
 
-<b style="font-size: 12px;">THE CUSTOMER - Why will anyone care?</b><br>
+<b style="font-size: 12px; color: #ED1C24;">THE CUSTOMER - Why will anyone care?</b><br>
 <b>Who:</b> [who]<br>
 <b>What:</b> [what]<br>
 <b>Why:</b> [why]<br><br>

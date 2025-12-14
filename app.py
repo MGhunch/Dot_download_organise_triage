@@ -36,12 +36,32 @@ def get_next_job_number(client_code):
 @app.route('/triage', methods=['POST'])
 def triage():
     try:
-        # Accept both JSON and plain text
-        if request.is_json:
-            data = request.get_json()
-            email_content = data.get('emailContent', '')
-        else:
+        # Accept ANY format - JSON, plain text, form data
+        email_content = ''
+        
+        # Try JSON first
+        try:
+            if request.is_json:
+                data = request.get_json()
+                email_content = data.get('emailContent', '') or data.get('body', '') or str(data)
+        except:
+            pass
+        
+        # Try plain text
+        if not email_content:
             email_content = request.get_data(as_text=True)
+        
+        # Try form data
+        if not email_content:
+            email_content = request.form.get('emailContent', '') or request.form.get('body', '')
+        
+        # Clean up any JSON wrapper that might have slipped through
+        if email_content.startswith('{"emailContent"'):
+            try:
+                parsed = json.loads(email_content)
+                email_content = parsed.get('emailContent', email_content)
+            except:
+                pass
         
         if not email_content:
             return jsonify({'error': 'No email content provided'}), 400

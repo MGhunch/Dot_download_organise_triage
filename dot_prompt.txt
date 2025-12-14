@@ -27,8 +27,8 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "clientName": "[Client business name]",
   "projectOwner": "[Client contact name or 'TBC']",
   "jobName": "[Shortest recognisable project name - no descriptors]",
-  "jobsummary:" [Short description that explains the job]", 
-  "objective": "[What client hopes to achieve, or 'TBC']",
+  "jobsummary:" "[Short description that explains the job]", 
+  "objective:" "[What client hopes to achieve, or 'TBC']",
   "hunchAsk": "[Specific work requested from Hunch]",
   "nextAction": "[What needs to happen next - usually meeting or task, or 'TBC']",
   "liveDate": "[Explicit date only, or 'TBC']",
@@ -52,7 +52,6 @@ TEMPLATE FOR emailBody (use HTML formatting):
 <b>Project Owner:</b> [projectOwner]<br>
 <b>Job Name:</b> [jobName]<br>
 <b>Summary:</b> [jobsummary]<br>
-<b>Objective:</b> [objective]<br>
 <b>Live date:</b> [liveDate]<br>
 <br>
 <h3>THE JOB - What needs to be done?</h3><br>

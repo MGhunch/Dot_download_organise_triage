@@ -3,12 +3,11 @@ from anthropic import Anthropic
 import httpx
 import json
 import os
-import requests
 
 app = Flask(__name__)
 
 custom_http_client = httpx.Client(
-    timeout=30.0,
+    timeout=60.0,
     follow_redirects=True
 )
 
@@ -20,52 +19,42 @@ client = Anthropic(
 with open('dot_prompt.txt', 'r') as f:
     DOT_PROMPT = f.read()
 
-def get_next_job_number(client_code):
-    try:
-        url = os.environ.get('GOOGLE_SCRIPT_URL')
-        response = requests.get(url, params={
-            'code': client_code,
-            'mode': 'next'
-        })
-        data = response.json()
-        return data.get('jobNumber', f'{client_code} TBC')
-    except Exception as e:
-        print(f"Error getting job number: {e}")
-        return f'{client_code} TBC'
-
 @app.route('/triage', methods=['POST'])
 def triage():
     try:
-        # Accept ANY format - JSON, plain text, form data
+        # DEBUG LOGGING
+        print(f"=== INCOMING REQUEST ===")
+        print(f"Content-Type: {request.content_type}")
+        print(f"Is JSON: {request.is_json}")
+        raw_data = request.get_data(as_text=True)
+        print(f"Raw data length: {len(raw_data)}")
+        print(f"First 200 chars: {raw_data[:200]}")
+        
+        # Get email content - try multiple methods
         email_content = ''
         
-        # Try JSON first
-        try:
-            if request.is_json:
-                data = request.get_json()
-                email_content = data.get('emailContent', '') or data.get('body', '') or str(data)
-        except:
-            pass
-        
-        # Try plain text
-        if not email_content:
-            email_content = request.get_data(as_text=True)
-        
-        # Try form data
-        if not email_content:
-            email_content = request.form.get('emailContent', '') or request.form.get('body', '')
-        
-        # Clean up any JSON wrapper that might have slipped through
-        if email_content.startswith('{"emailContent"'):
+        # Method 1: JSON
+        if request.is_json:
             try:
-                parsed = json.loads(email_content)
-                email_content = parsed.get('emailContent', email_content)
+                data = request.get_json()
+                email_content = data.get('emailContent', '') or data.get('body', '')
+                print(f"Got content from JSON: {len(email_content)} chars")
             except:
                 pass
         
+        # Method 2: Plain text
         if not email_content:
+            email_content = raw_data.strip()
+            print(f"Got content from raw data: {len(email_content)} chars")
+        
+        # Final check
+        if not email_content:
+            print("ERROR: No email content found")
             return jsonify({'error': 'No email content provided'}), 400
         
+        print(f"Sending to Claude: {len(email_content)} chars")
+        
+        # Call Claude
         response = client.messages.create(
             model='claude-sonnet-4-20250514',
             max_tokens=2000,
@@ -76,32 +65,30 @@ def triage():
             ]
         )
         
+        # Parse response
         content = response.content[0].text
+        print(f"Claude response: {len(content)} chars")
+        
         analysis = json.loads(content)
         
-        client_code = analysis.get('clientCode', 'TBC')
-        if client_code not in ['HUN', 'TBC']:
-            job_number = get_next_job_number(client_code)
-        else:
-            job_number = f'{client_code} TBC'
-        
+        # Return analysis
         return jsonify({
-            'jobNumber': job_number,
-            'jobName': analysis.get('jobName', 'Untitled'),
-            'clientCode': client_code,
+            'clientCode': analysis.get('clientCode', 'TBC'),
             'clientName': analysis.get('clientName', ''),
             'projectOwner': analysis.get('projectOwner', ''),
+            'jobName': analysis.get('jobName', 'Untitled'),
             'emailBody': analysis.get('emailBody', ''),
             'fullAnalysis': analysis
         })
         
     except json.JSONDecodeError as e:
+        print(f"JSON parse error: {e}")
         return jsonify({
             'error': 'Claude returned invalid JSON',
-            'details': str(e),
-            'raw_response': content
+            'details': str(e)
         }), 500
     except Exception as e:
+        print(f"Error: {e}")
         return jsonify({
             'error': 'Internal server error',
             'details': str(e)

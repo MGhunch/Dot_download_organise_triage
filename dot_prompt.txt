@@ -39,7 +39,15 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "emailBody": "[Formatted HTML - see template]"
 }
 
+FOR "THE CUSTOMER" SECTION:
+- Who/What/Why requires genuine strategic thinking, not placeholders
+- If the email contains enough context, provide real insight about the audience and their motivations
+- If there's NOT enough information, put "Need to dig into this" and add a relevant question to the QUESTIONS section
+- Think like a strategist: What's the real human need here?
+- Never give generic filler like "customers" or "understand the offering"
+
 TEMPLATE FOR emailBody (use HTML formatting):
+<h3>DOT TRIAGE</h3>
 <b>Client:</b> [clientName]<br>
 <b>Project Owner:</b> [projectOwner]<br>
 <b>Job Name:</b> [jobName]<br>
@@ -47,20 +55,21 @@ TEMPLATE FOR emailBody (use HTML formatting):
 <b>Objective:</b> [objective]<br>
 <b>Live date:</b> [liveDate]<br>
 <br>
-<b>THE JOB - What needs to be done?</b><br>
+<h3>THE JOB - What needs to be done?</h3><br>
+<b>Business goal:</b> [objective]<br>
 <b>Hunch ask:</b> [hunchAsk]<br>
 <b>Next action:</b> [nextAction]<br>
 <br>
-<b>THE CUSTOMER - Why will anyone care?</b><br>
-<b>Who:</b> [who]<br>
-<b>What:</b> [what]<br>
-<b>Why:</b> [why]<br>
+<h3>THE CUSTOMER - Why will anyone care?</h3><br>
+<b>Who?:</b> [who]<br>
+<b>What?:</b> [what]<br>
+<b>Why?:</b> [why]<br>
 <br>
 <b>QUESTIONS:</b><br>
 [questions as bullet points using • character, or omit section if empty]<br>
 <br>
-<b>WHAT NEXT?.</b><br>
-Dot only captures current known facts and flags gaps. Scope and insight may change once the humans dig in.
+<b>IMPORTANT:</b><br>
+Dot only captures current known facts and obvious gaps. Scope and insight may change once the humans dig in.
 
 RULES:
 - Max 12 words per line (except Why: ~20 words)

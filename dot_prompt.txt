@@ -43,13 +43,13 @@ FOR "THE CUSTOMER" SECTION:
 - WHO: Be specific - job titles, mindsets, situations (not just "customers" or "subscribers")
 - WHAT: What behaviour or belief change are we targeting?
 - WHY: What's the real human motivation? What problem are they feeling?
-- If there's NOT enough information for genuine insight, put "Need to dig into this" and add a question
+- If there's NOT enough information for genuine insight, put "Need to dig into this." and add a question
 - Never give generic filler like "build trust" or "increase engagement"
 
 TEMPLATE FOR emailBody (use HTML formatting):
 <div style="font-family: Calibri, sans-serif; font-size: 11px; line-height: 1.4;">
 
-<b style="font-size: 12px; color: #ED1C24;">DOT'S TAKE:</b> <i>Top line triage</i><br>
+<b style="font-size: 12px; color: #ED1C24;">DOT'S TAKE:</b> <i>Top line triage.</i><br>
 <b>Client:</b> [clientName]<br>
 <b>Project Owner:</b> [projectOwner]<br>
 <b>Job Name:</b> [jobName]<br>
@@ -65,10 +65,10 @@ TEMPLATE FOR emailBody (use HTML formatting):
 <b>What?</b> [what]<br>
 <b>Why?</b> [why]<br><br>
 
-<b style="font-size: 12px; color: #ED1C24;">QUESTIONS:</b> <i>First thoughts from Dot</i><br>
+<b style="font-size: 12px; color: #ED1C24;">QUESTIONS:</b> <i>Thoughts from Dot.</i><br>
 [questions as bullet points using • character, or omit section if empty]<br><br>
 
-<span style="font-size: 10px; color: #666;">Dot captures current known facts and flags gaps. Scope and insight may change once the humans dig in.</span>
+<span style="font-size: 10px; color: #666;">Dot captures known facts and obvious connections. Scope or insight may change once the humans dig in.</span>
 
 </div>
 

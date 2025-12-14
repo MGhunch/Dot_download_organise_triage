@@ -27,7 +27,7 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "clientName": "[Client business name]",
   "projectOwner": "[Client contact name or 'TBC']",
   "jobName": "[Shortest recognisable project name - no descriptors]",
-  "jobsummary:" "[Short description that explains the job]", 
+  "jobSummary:" "[Short description that explains the job]", 
   "objective:" "[What client hopes to achieve, or 'TBC']",
   "hunchAsk": "[Specific work requested from Hunch]",
   "nextAction": "[What needs to happen next - usually meeting or task, or 'TBC']",

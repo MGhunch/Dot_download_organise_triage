@@ -24,11 +24,11 @@ AIRTABLE_TABLE_NAME = 'Job Numbers'
 with open('dot_prompt.txt', 'r') as f:
     DOT_PROMPT = f.read()
 
-def get_next_job_number(client_code):
-    """Look up client in Airtable, increment job number, return formatted string"""
+def get_job_number_and_team(client_code):
+    """Look up client in Airtable, increment job number, return job number and team ID"""
     if not AIRTABLE_API_KEY:
         print("No Airtable API key configured")
-        return f"{client_code} TBC"
+        return f"{client_code} TBC", None
     
     try:
         headers = {
@@ -47,13 +47,14 @@ def get_next_job_number(client_code):
         
         if not records:
             print(f"Client code '{client_code}' not found in Airtable")
-            return f"{client_code} TBC"
+            return f"{client_code} TBC", None
         
         record = records[0]
         record_id = record['id']
         fields = record['fields']
         
         current_number = fields.get('Next #', 1)
+        team_id = fields.get('Teams ID', None)
         next_number = current_number + 1
         
         # Format job number (e.g., "TOW 023")
@@ -66,12 +67,12 @@ def get_next_job_number(client_code):
         update_response = httpx.patch(update_url, headers=headers, json=update_data, timeout=10.0)
         update_response.raise_for_status()
         
-        print(f"Job number assigned: {job_number}, next will be {next_number}")
-        return job_number
+        print(f"Job number assigned: {job_number}, Team ID: {team_id}, next will be {next_number}")
+        return job_number, team_id
         
     except Exception as e:
         print(f"Airtable error: {e}")
-        return f"{client_code} TBC"
+        return f"{client_code} TBC", None
 
 @app.route('/triage', methods=['POST'])
 def triage():
@@ -125,16 +126,18 @@ def triage():
         
         analysis = json.loads(content)
         
-        # Get job number from Airtable
+        # Get job number and team ID from Airtable
         client_code = analysis.get('clientCode', 'TBC')
         if client_code and client_code != 'TBC':
-            job_number = get_next_job_number(client_code)
+            job_number, team_id = get_job_number_and_team(client_code)
         else:
             job_number = 'TBC'
+            team_id = None
         
         # Return analysis
         return jsonify({
             'jobNumber': job_number,
+            'teamId': team_id,
             'clientCode': client_code,
             'clientName': analysis.get('clientName', ''),
             'projectOwner': analysis.get('projectOwner', ''),

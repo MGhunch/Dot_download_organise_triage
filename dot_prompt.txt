@@ -25,7 +25,7 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "clientCode": "[ONE/SKY/TOW/FIS/FST/WKA/HUN/TBC]",
   "clientName": "[Client business name]",
   "projectOwner": "[Client contact name or 'TBC']",
-  "jobName": "[Shortest recognisable project name - no descriptors - must be less than 35 characters]",
+  "jobName": "[Max 35 characters - short project name only]",
   "jobSummary": "[Short description that explains the job]",
   "objective": "[What client hopes to achieve, or 'TBC']",
   "hunchAsk": "[Specific work requested from Hunch]",
@@ -75,6 +75,7 @@ TEMPLATE FOR emailBody (use HTML formatting):
 RULES:
 - Max 12 words per line (except Why: ~20 words)
 - Only ask 1-3 questions that unlock progress
+- jobName MUST be under 35 characters - cut words, not letters (e.g., "Mailchimp Banner" not "Mailchimp Email Campaign Banner"
 - Do not invent facts or infer identity/scope/timing
 - Prefer saying less to saying something uncertain
 - Use HTML tags for formatting: <b> for bold, <br> for line breaks, <i> for italic

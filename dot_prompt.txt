@@ -25,7 +25,7 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "clientCode": "[ONE/SKY/TOW/FIS/FST/WKA/HUN/TBC]",
   "clientName": "[Client business name]",
   "projectOwner": "[Client contact name or 'TBC']",
-  "jobName": "[Shortest recognisable project name - no descriptors]",
+  "jobName": "[Shortest recognisable project name - no descriptors - must be less than 35 characters]",
   "jobSummary": "[Short description that explains the job]",
   "objective": "[What client hopes to achieve, or 'TBC']",
   "hunchAsk": "[Specific work requested from Hunch]",

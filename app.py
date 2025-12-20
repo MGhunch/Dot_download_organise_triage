@@ -145,7 +145,7 @@ def triage():
             'clientName': analysis.get('clientName', ''),
             'projectOwner': analysis.get('projectOwner', ''),
             'jobName': analysis.get('jobName', 'Untitled'),
-            'emailBody': analysis.get('emailBody', ''),
+            'dotResponse': analysis.get('dotResponse', ''),
             'fullAnalysis': analysis
         })
         

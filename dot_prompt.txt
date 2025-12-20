@@ -35,7 +35,7 @@ OUTPUT REQUIREMENT: Return ONLY valid JSON with this exact structure (no markdow
   "what": "[What behaviour or belief change are we targeting?]",
   "why": "[What's the real human motivation? What problem are they feeling?]",
   "questions": ["[Question 1]", "[Question 2]"],
-  "emailBody": "[Formatted HTML - see template]"
+  "dotResponse": "[Formatted HTML - see template]"
 }
 
 FOR "THE CUSTOMER" SECTION:

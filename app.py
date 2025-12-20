@@ -24,8 +24,44 @@ AIRTABLE_TABLE_NAME = 'Job Numbers'
 with open('dot_prompt.txt', 'r') as f:
     DOT_PROMPT = f.read()
 
-def get_job_info_from_airtable(client_code):
-    """Look up client in Airtable, increment job number, return job number, team ID, and SharePoint URL"""
+def get_client_info(client_code):
+    """Look up client in Airtable, return team ID and SharePoint URL"""
+    if not AIRTABLE_API_KEY:
+        print("No Airtable API key configured")
+        return None, None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {AIRTABLE_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        search_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE_NAME}"
+        params = {'filterByFormula': f"{{Client code}}='{client_code}'"}
+        
+        response = httpx.get(search_url, headers=headers, params=params, timeout=10.0)
+        response.raise_for_status()
+        
+        records = response.json().get('records', [])
+        
+        if not records:
+            print(f"Client code '{client_code}' not found in Airtable")
+            return None, None
+        
+        record = records[0]
+        fields = record['fields']
+        
+        team_id = fields.get('Teams ID', None)
+        sharepoint_url = fields.get('Sharepoint ID', None)
+        
+        return team_id, sharepoint_url
+        
+    except Exception as e:
+        print(f"Airtable error: {e}")
+        return None, None
+
+def get_next_job_number(client_code):
+    """Look up client in Airtable, increment job number, return formatted string, team ID, and SharePoint URL"""
     if not AIRTABLE_API_KEY:
         print("No Airtable API key configured")
         return f"{client_code} TBC", None, None
@@ -36,7 +72,6 @@ def get_job_info_from_airtable(client_code):
             'Content-Type': 'application/json'
         }
         
-        # Search for the client code
         search_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_TABLE_NAME}"
         params = {'filterByFormula': f"{{Client code}}='{client_code}'"}
         
@@ -68,7 +103,7 @@ def get_job_info_from_airtable(client_code):
         update_response = httpx.patch(update_url, headers=headers, json=update_data, timeout=10.0)
         update_response.raise_for_status()
         
-        print(f"Job number assigned: {job_number}, Team ID: {team_id}, SharePoint: {sharepoint_url}, next will be {next_number}")
+        print(f"Job number assigned: {job_number}, next will be {next_number}")
         return job_number, team_id, sharepoint_url
         
     except Exception as e:
@@ -127,27 +162,53 @@ def triage():
         
         analysis = json.loads(content)
         
-        # Get job number, team ID, and SharePoint URL from Airtable
+        # Get intent and client code from Claude's analysis
+        intent = analysis.get('intent', 'unclear')
         client_code = analysis.get('clientCode', 'TBC')
-        if client_code and client_code != 'TBC':
-            job_number, team_id, sharepoint_url = get_job_info_from_airtable(client_code)
-        else:
-            job_number = 'TBC'
-            team_id = None
-            sharepoint_url = None
         
-        # Return analysis
-        return jsonify({
-            'jobNumber': job_number,
-            'teamId': team_id,
-            'sharepointUrl': sharepoint_url,
-            'clientCode': client_code,
-            'clientName': analysis.get('clientName', ''),
-            'projectOwner': analysis.get('projectOwner', ''),
-            'jobName': analysis.get('jobName', 'Untitled'),
-            'dotResponse': analysis.get('dotResponse', ''),
-            'fullAnalysis': analysis
-        })
+        # Initialize response with all of Claude's analysis
+        result = {**analysis}
+        
+        # Handle based on intent
+        if intent == 'triage':
+            # New job - get job number from Airtable (increments counter)
+            if client_code and client_code != 'TBC':
+                job_number, team_id, sharepoint_url = get_next_job_number(client_code)
+                result['jobNumber'] = job_number
+                result['teamId'] = team_id
+                result['sharepointUrl'] = sharepoint_url
+            else:
+                result['jobNumber'] = 'TBC'
+                result['teamId'] = None
+                result['sharepointUrl'] = None
+                
+        elif intent in ['update', 'job_number_reply']:
+            # Existing job - just get team ID and SharePoint URL (no increment)
+            if client_code and client_code != 'TBC':
+                team_id, sharepoint_url = get_client_info(client_code)
+                result['teamId'] = team_id
+                result['sharepointUrl'] = sharepoint_url
+            else:
+                result['teamId'] = None
+                result['sharepointUrl'] = None
+                
+        elif intent == 'update_needs_job':
+            # Update but no job number - still need client info for potential later use
+            if client_code and client_code != 'TBC':
+                team_id, sharepoint_url = get_client_info(client_code)
+                result['teamId'] = team_id
+                result['sharepointUrl'] = sharepoint_url
+            else:
+                result['teamId'] = None
+                result['sharepointUrl'] = None
+                
+        else:
+            # Unclear intent
+            result['teamId'] = None
+            result['sharepointUrl'] = None
+        
+        print(f"Returning intent: {intent}")
+        return jsonify(result)
         
     except json.JSONDecodeError as e:
         print(f"JSON parse error: {e}")

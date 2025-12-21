@@ -21,7 +21,7 @@ client = Anthropic(
 AIRTABLE_API_KEY = os.environ.get('AIRTABLE_API_KEY')
 AIRTABLE_BASE_ID = 'app8CI7NAZqhQ4G1Y'
 AIRTABLE_CLIENTS_TABLE = 'Clients'
-AIRTABLE_JOBS_TABLE = 'Jobs'
+AIRTABLE_JOBS_TABLE = 'Projects'
 
 # Load prompts from files
 with open('dot_traffic_prompt.txt', 'r') as f:
@@ -111,11 +111,11 @@ def create_job_in_airtable(job_number, job_name, client_code, description, proje
         job_data = {
             'fields': {
                 'Job Number': job_number,
-                'Project name': job_name,
+                'Project Name': job_name,
                 'Description': description,
                 'Status': 'In Progress',
                 'Stage': 'Triage',
-                'Project owner': project_owner,
+                'Project Owner': project_owner,
                 'Start Date': date.today().isoformat()
             }
         }
@@ -303,5 +303,7 @@ def health():
 
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)

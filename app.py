@@ -31,6 +31,18 @@ with open('dot_triage_prompt.txt', 'r') as f:
     TRIAGE_PROMPT = f.read()
 
 
+def strip_markdown_json(content):
+    """Strip markdown code blocks from Claude's JSON response"""
+    content = content.strip()
+    if content.startswith('```'):
+        # Remove first line (```json or ```)
+        content = content.split('\n', 1)[1] if '\n' in content else content[3:]
+    if content.endswith('```'):
+        # Remove trailing ```
+        content = content.rsplit('```', 1)[0]
+    return content.strip()
+
+
 def get_job_info_from_airtable(client_code):
     """Look up client in Airtable, increment job number, return job number, team ID, SharePoint URL, and client record ID"""
     if not AIRTABLE_API_KEY:
@@ -156,6 +168,7 @@ def traffic():
         
         # Parse Claude's JSON response
         content = response.content[0].text
+        content = strip_markdown_json(content)
         routing = json.loads(content)
         
         return jsonify(routing)
@@ -199,6 +212,7 @@ def triage():
         
         # Parse Claude's JSON response
         content = response.content[0].text
+        content = strip_markdown_json(content)
         analysis = json.loads(content)
         
         # Get job number and client info from Airtable
@@ -233,6 +247,7 @@ def triage():
             'teamId': team_id,
             'sharepointUrl': sharepoint_url,
             'jobRecordId': job_record_id,
+            'emailBody': analysis.get('emailBody', ''),
             'fullAnalysis': analysis
         })
         

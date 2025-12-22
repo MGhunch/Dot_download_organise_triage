@@ -64,8 +64,9 @@ Use this HTML structure:
 <b>QUESTIONS:</b><br>
 - [question 1]<br>
 - [question 2]<br>
+- [question 3]<br>
 <br>
-<b>NEXT UP, HUMANS.</b><br>
+<b>NOTE:</b><br>
 Dot captures known facts and flags gaps. Scope and insight may change once the humans dig in.
 
 === FOR "THE CUSTOMER" SECTION ===

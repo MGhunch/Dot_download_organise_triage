@@ -30,7 +30,14 @@ Based on what you find, classify the email:
    - Reply in a thread about existing work
    - Contains "update" (any case) with job number
 
-3. **CLARIFY** — No job number AND unclear if new job
+3. **WIP** — Sender is asking for a Work In Progress report
+   - "Send me the WIP"
+   - "What's the status on [client] projects"
+   - "WIP for Sky" or "One NZ WIP"
+   - Contains "WIP" (any case) or "work in progress"
+   - Asking for project status summary for a client
+
+4. **CLARIFY** — No job number AND unclear if new job
    - Vague request without enough context
    - Could be about existing work but no job number
    - Need to ask sender which job this relates to
@@ -82,6 +89,16 @@ Return ONLY valid JSON (no markdown, no explanation):
   "reason": "[brief reason for routing decision]"
 }
 
+--- IF ROUTING TO WIP ---
+{
+  "route": "wip",
+  "jobNumber": null,
+  "clientCode": "[client code for WIP request]",
+  "senderEmail": "[sender's email address]",
+  "senderName": "[sender's name if found]",
+  "reason": "[brief reason for routing decision]"
+}
+
 --- IF ROUTING TO CLARIFY ---
 {
   "route": "clarify",
@@ -112,6 +129,7 @@ Use this HTML structure:
 - Job number pattern is ALWAYS: 3-letter code + space + 3 digits (e.g., ONE 125)
 - If you find a job number, route is ALWAYS "update"
 - If no job number but clearly a new brief, route is "triage"
+- If asking for WIP or project status summary, route is "wip"
 - When in doubt, route is "clarify"
 - Never invent job numbers
 - Keep "reason" under 20 words

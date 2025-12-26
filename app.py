@@ -3,6 +3,7 @@ from anthropic import Anthropic
 import httpx
 import json
 import os
+from datetime import date, timedelta
 
 app = Flask(__name__)
 
@@ -22,6 +23,7 @@ AIRTABLE_API_KEY = os.environ.get('AIRTABLE_API_KEY')
 AIRTABLE_BASE_ID = 'app8CI7NAZqhQ4G1Y'
 AIRTABLE_CLIENTS_TABLE = 'Clients'
 AIRTABLE_JOBS_TABLE = 'Projects'
+AIRTABLE_UPDATES_TABLE = 'Updates'
 
 # Load prompts from files
 with open('dot_traffic_prompt.txt', 'r') as f:
@@ -44,6 +46,17 @@ def strip_markdown_json(content):
         # Remove trailing ```
         content = content.rsplit('```', 1)[0]
     return content.strip()
+
+
+def get_next_working_day(start_date, days=5):
+    """Add working days (skipping weekends) to a date."""
+    current = start_date
+    added = 0
+    while added < days:
+        current += timedelta(days=1)
+        if current.weekday() < 5:  # Monday = 0, Friday = 4
+            added += 1
+    return current
 
 
 # ===================
@@ -152,9 +165,48 @@ def get_project_from_airtable(job_number):
         return None
 
 
-def update_project_in_airtable(job_number, updates):
-    """Update project fields in Airtable. 
-    Used by UPDATE endpoint to write changes."""
+def create_update_in_airtable(project_record_id, update_text, update_due=None):
+    """Create a new update record in the Updates table."""
+    if not AIRTABLE_API_KEY:
+        print("No Airtable API key configured")
+        return False
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {AIRTABLE_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Default to 5 working days if no due date provided
+        if not update_due:
+            update_due = get_next_working_day(date.today(), 5).isoformat()
+        
+        # Build the update record
+        update_data = {
+            'fields': {
+                'Project Link': [project_record_id],
+                'Update': update_text,
+                'Updated on': date.today().isoformat(),
+                'Update due': update_due
+            }
+        }
+        
+        # Create the record
+        create_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_UPDATES_TABLE}"
+        response = httpx.post(create_url, headers=headers, json=update_data, timeout=10.0)
+        response.raise_for_status()
+        
+        print(f"Created update for project {project_record_id}: {update_text}")
+        return True
+        
+    except Exception as e:
+        print(f"Error creating update in Airtable: {e}")
+        return False
+
+
+def update_project_fields_in_airtable(job_number, updates):
+    """Update specific fields on the Project record (Stage, Status, Live Date, With Client).
+    NOT used for Update field - that comes from Updates table lookup."""
     if not AIRTABLE_API_KEY:
         print("No Airtable API key configured")
         return False
@@ -181,14 +233,13 @@ def update_project_in_airtable(job_number, updates):
         record_id = records[0]['id']
         
         # Build update payload - only include non-null values
+        # Note: We DON'T update 'Update' field here - it's a lookup from Updates table
         update_fields = {}
         
         field_mapping = {
-            'Update': 'Update',
             'Stage': 'Stage',
             'Status': 'Status',
             'Live Date': 'Live Date',
-            'Update due': 'Update due',
             'With Client?': 'With Client?'
         }
         
@@ -197,7 +248,7 @@ def update_project_in_airtable(job_number, updates):
                 update_fields[airtable_field] = updates[key]
         
         if not update_fields:
-            print("No fields to update")
+            print("No project fields to update")
             return True
         
         # Update the record
@@ -223,8 +274,6 @@ def create_job_in_airtable(job_number, job_name, client_code, description, proje
         return None
     
     try:
-        from datetime import date
-        
         headers = {
             'Authorization': f'Bearer {AIRTABLE_API_KEY}',
             'Content-Type': 'application/json'
@@ -239,8 +288,7 @@ def create_job_in_airtable(job_number, job_name, client_code, description, proje
                 'Status': 'In Progress',
                 'Stage': 'Triage',
                 'Project Owner': project_owner,
-                'Start Date': date.today().isoformat(),
-                'Round': 0  # NEW: Initialize round at 0
+                'Start Date': date.today().isoformat()
             }
         }
         
@@ -250,7 +298,7 @@ def create_job_in_airtable(job_number, job_name, client_code, description, proje
         
         # Create the record
         create_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_JOBS_TABLE}"
-        response = httpx.post(create_url, headers=headers, json=job_data, timeout=10.0)
+        response = httpx.post(create_url, headers=headers, json=create_data, timeout=10.0)
         response.raise_for_status()
         
         new_record = response.json()
@@ -269,7 +317,7 @@ def create_job_in_airtable(job_number, job_name, client_code, description, proje
 def traffic():
     """Route incoming emails to the correct handler.
     
-    UPDATED: Now accepts additional fields and validates job numbers against Airtable.
+    Accepts additional fields and validates job numbers against Airtable.
     """
     try:
         data = request.get_json()
@@ -282,10 +330,10 @@ def traffic():
         # Original fields
         subject_line = data.get('subjectLine', '')
         
-        # NEW: Additional fields for smarter routing
+        # Additional fields for smarter routing
         sender_email = data.get('senderEmail', '')
         sender_name = data.get('senderName', '')
-        all_recipients = data.get('allRecipients', [])  # List of TO and CC emails
+        all_recipients = data.get('allRecipients', [])
         has_attachments = data.get('hasAttachments', False)
         attachment_names = data.get('attachmentNames', [])
         
@@ -293,9 +341,9 @@ def traffic():
         full_content = f"""Subject: {subject_line}
 
 From: {sender_name} <{sender_email}>
-Recipients: {', '.join(all_recipients) if all_recipients else 'Not specified'}
+Recipients: {', '.join(all_recipients) if isinstance(all_recipients, list) else all_recipients}
 Has Attachments: {has_attachments}
-Attachment Names: {', '.join(attachment_names) if attachment_names else 'None'}
+Attachment Names: {', '.join(attachment_names) if isinstance(attachment_names, list) else attachment_names}
 
 Email Body:
 {email_content}"""
@@ -316,7 +364,7 @@ Email Body:
         content = strip_markdown_json(content)
         routing = json.loads(content)
         
-        # NEW: If job number found, validate against Airtable and enrich
+        # If job number found, validate against Airtable and enrich
         if routing.get('jobNumber'):
             project = get_project_from_airtable(routing['jobNumber'])
             
@@ -441,7 +489,7 @@ def triage():
 def update():
     """Process job updates.
     
-    NEW: Full implementation replacing placeholder.
+    Creates a record in the Updates table and optionally updates Project fields.
     """
     try:
         data = request.get_json()
@@ -493,15 +541,36 @@ Email/Message Content:
         if analysis.get('error'):
             return jsonify(analysis), 400
         
-        # Update Airtable with the changes
-        if analysis.get('projectUpdates'):
-            update_success = update_project_in_airtable(
-                job_number, 
-                analysis['projectUpdates']
-            )
-            analysis['airtableUpdated'] = update_success
+        # Get the update text
+        update_text = analysis.get('airtableUpdate', '')
         
-        # Add project context to response
+        # Get due date from analysis, or default to 5 working days
+        update_due = None
+        if analysis.get('projectUpdates', {}).get('Update due'):
+            update_due = analysis['projectUpdates']['Update due']
+        # If no due date specified, create_update_in_airtable will default to 5 working days
+        
+        # Create the update record in Updates table
+        update_created = False
+        if update_text:
+            update_created = create_update_in_airtable(
+                project_record_id=project['recordId'],
+                update_text=update_text,
+                update_due=update_due
+            )
+        
+        # Update Project fields if needed (Stage, Status, Live Date, With Client)
+        project_updated = False
+        if analysis.get('projectUpdates'):
+            # Remove 'Update' and 'Update due' from project updates - those go to Updates table
+            project_fields = {k: v for k, v in analysis['projectUpdates'].items() 
+                           if k not in ['Update', 'Update due']}
+            if project_fields:
+                project_updated = update_project_fields_in_airtable(job_number, project_fields)
+        
+        # Add results to response
+        analysis['updateCreated'] = update_created
+        analysis['projectUpdated'] = project_updated
         analysis['teamsChannelId'] = project['teamsChannelId']
         analysis['projectRecordId'] = project['recordId']
         

@@ -30,6 +30,9 @@ with open('dot_traffic_prompt.txt', 'r') as f:
 with open('dot_triage_prompt.txt', 'r') as f:
     TRIAGE_PROMPT = f.read()
 
+with open('dot_update_prompt.txt', 'r') as f:
+    UPDATE_PROMPT = f.read()
+
 
 def strip_markdown_json(content):
     """Strip markdown code blocks from Claude's JSON response"""
@@ -43,8 +46,13 @@ def strip_markdown_json(content):
     return content.strip()
 
 
+# ===================
+# AIRTABLE HELPERS
+# ===================
+
 def get_job_info_from_airtable(client_code):
-    """Look up client in Airtable, increment job number, return job number, team ID, SharePoint URL, and client record ID"""
+    """Look up client in Airtable, increment job number, return job number, team ID, SharePoint URL, and client record ID
+    Used by TRIAGE for new jobs"""
     if not AIRTABLE_API_KEY:
         print("No Airtable API key configured")
         return f"{client_code} TBC", None, None, None
@@ -93,8 +101,123 @@ def get_job_info_from_airtable(client_code):
         return f"{client_code} TBC", None, None, None
 
 
+def get_project_from_airtable(job_number):
+    """Look up existing project by job number. Returns project details or None.
+    Used by TRAFFIC to validate job numbers and enrich routing data."""
+    if not AIRTABLE_API_KEY:
+        print("No Airtable API key configured")
+        return None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {AIRTABLE_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Search for the job number
+        search_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_JOBS_TABLE}"
+        params = {'filterByFormula': f"{{Job Number}}='{job_number}'"}
+        
+        response = httpx.get(search_url, headers=headers, params=params, timeout=10.0)
+        response.raise_for_status()
+        
+        records = response.json().get('records', [])
+        
+        if not records:
+            print(f"Job '{job_number}' not found in Airtable")
+            return None
+        
+        record = records[0]
+        fields = record['fields']
+        
+        # Get client name from linked record if available
+        client_name = fields.get('Client', '')
+        if isinstance(client_name, list):
+            client_name = client_name[0] if client_name else ''
+        
+        return {
+            'recordId': record['id'],
+            'jobNumber': fields.get('Job Number', job_number),
+            'jobName': fields.get('Project Name', ''),
+            'clientName': client_name,
+            'stage': fields.get('Stage', ''),
+            'status': fields.get('Status', ''),
+            'round': fields.get('Round', 0),
+            'withClient': fields.get('With Client?', False),
+            'teamsChannelId': fields.get('Teams Channel ID', None)
+        }
+        
+    except Exception as e:
+        print(f"Error looking up project in Airtable: {e}")
+        return None
+
+
+def update_project_in_airtable(job_number, updates):
+    """Update project fields in Airtable. 
+    Used by UPDATE endpoint to write changes."""
+    if not AIRTABLE_API_KEY:
+        print("No Airtable API key configured")
+        return False
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {AIRTABLE_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        # First find the record
+        search_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_JOBS_TABLE}"
+        params = {'filterByFormula': f"{{Job Number}}='{job_number}'"}
+        
+        response = httpx.get(search_url, headers=headers, params=params, timeout=10.0)
+        response.raise_for_status()
+        
+        records = response.json().get('records', [])
+        
+        if not records:
+            print(f"Job '{job_number}' not found for update")
+            return False
+        
+        record_id = records[0]['id']
+        
+        # Build update payload - only include non-null values
+        update_fields = {}
+        
+        field_mapping = {
+            'Update': 'Update',
+            'Stage': 'Stage',
+            'Status': 'Status',
+            'Live Date': 'Live Date',
+            'Update due': 'Update due',
+            'With Client?': 'With Client?'
+        }
+        
+        for key, airtable_field in field_mapping.items():
+            if key in updates and updates[key] is not None:
+                update_fields[airtable_field] = updates[key]
+        
+        if not update_fields:
+            print("No fields to update")
+            return True
+        
+        # Update the record
+        update_url = f"https://api.airtable.com/v0/{AIRTABLE_BASE_ID}/{AIRTABLE_JOBS_TABLE}/{record_id}"
+        update_data = {'fields': update_fields}
+        
+        response = httpx.patch(update_url, headers=headers, json=update_data, timeout=10.0)
+        response.raise_for_status()
+        
+        print(f"Updated project {job_number}: {update_fields}")
+        return True
+        
+    except Exception as e:
+        print(f"Error updating project in Airtable: {e}")
+        return False
+
+
 def create_job_in_airtable(job_number, job_name, client_code, description, project_owner, client_record_id):
-    """Create a new job record in the Jobs table"""
+    """Create a new job record in the Jobs table.
+    Used by TRIAGE for new jobs."""
     if not AIRTABLE_API_KEY:
         print("No Airtable API key configured")
         return None
@@ -116,7 +239,8 @@ def create_job_in_airtable(job_number, job_name, client_code, description, proje
                 'Status': 'In Progress',
                 'Stage': 'Triage',
                 'Project Owner': project_owner,
-                'Start Date': date.today().isoformat()
+                'Start Date': date.today().isoformat(),
+                'Round': 0  # NEW: Initialize round at 0
             }
         }
         
@@ -143,17 +267,38 @@ def create_job_in_airtable(job_number, job_name, client_code, description, proje
 # ===================
 @app.route('/traffic', methods=['POST'])
 def traffic():
-    """Route incoming emails to the correct handler"""
+    """Route incoming emails to the correct handler.
+    
+    UPDATED: Now accepts additional fields and validates job numbers against Airtable.
+    """
     try:
         data = request.get_json()
-        email_content = data.get('emailContent', '')
-        subject_line = data.get('subjectLine', '')
         
+        # Required field
+        email_content = data.get('emailContent', '')
         if not email_content:
             return jsonify({'error': 'No email content provided'}), 400
         
-        # Combine subject and body for analysis
-        full_content = f"Subject: {subject_line}\n\n{email_content}"
+        # Original fields
+        subject_line = data.get('subjectLine', '')
+        
+        # NEW: Additional fields for smarter routing
+        sender_email = data.get('senderEmail', '')
+        sender_name = data.get('senderName', '')
+        all_recipients = data.get('allRecipients', [])  # List of TO and CC emails
+        has_attachments = data.get('hasAttachments', False)
+        attachment_names = data.get('attachmentNames', [])
+        
+        # Build content for Claude
+        full_content = f"""Subject: {subject_line}
+
+From: {sender_name} <{sender_email}>
+Recipients: {', '.join(all_recipients) if all_recipients else 'Not specified'}
+Has Attachments: {has_attachments}
+Attachment Names: {', '.join(attachment_names) if attachment_names else 'None'}
+
+Email Body:
+{email_content}"""
         
         # Call Claude to determine routing
         response = client.messages.create(
@@ -170,6 +315,28 @@ def traffic():
         content = response.content[0].text
         content = strip_markdown_json(content)
         routing = json.loads(content)
+        
+        # NEW: If job number found, validate against Airtable and enrich
+        if routing.get('jobNumber'):
+            project = get_project_from_airtable(routing['jobNumber'])
+            
+            if project:
+                # Enrich routing with project data
+                routing['jobName'] = project['jobName']
+                routing['clientName'] = project['clientName']
+                routing['currentRound'] = project['round']
+                routing['currentStage'] = project['stage']
+                routing['withClient'] = project['withClient']
+                routing['teamsChannelId'] = project['teamsChannelId']
+                routing['projectRecordId'] = project['recordId']
+            else:
+                # Job number not found - reroute to clarify
+                routing['route'] = 'clarify'
+                routing['reason'] = f"Job {routing['jobNumber']} not found in system"
+                routing['clarifyEmail'] = f"""<p>Hi {routing.get('senderName', 'there')},</p>
+<p>I couldn't find job {routing['jobNumber']} in our system.</p>
+<p>Could you double-check the job number? Or if this is a new job, just reply "Triage" and I'll set it up.</p>
+<p>Thanks,<br>Dot</p>"""
         
         return jsonify(routing)
         
@@ -191,7 +358,10 @@ def traffic():
 # ===================
 @app.route('/triage', methods=['POST'])
 def triage():
-    """Process new job triage"""
+    """Process new job triage.
+    
+    UNCHANGED - keeping exactly as it was since it works.
+    """
     try:
         data = request.get_json()
         email_content = data.get('emailContent', '')
@@ -265,23 +435,84 @@ def triage():
 
 
 # ===================
-# UPDATE ENDPOINT (placeholder)
+# UPDATE ENDPOINT
 # ===================
 @app.route('/update', methods=['POST'])
 def update():
-    """Process job updates - placeholder for now"""
+    """Process job updates.
+    
+    NEW: Full implementation replacing placeholder.
+    """
     try:
         data = request.get_json()
         
-        return jsonify({
-            'status': 'placeholder',
-            'message': 'Dot Update endpoint - coming soon',
-            'received': {
-                'jobNumber': data.get('jobNumber'),
-                'emailContent': data.get('emailContent', '')[:100] + '...'
-            }
-        })
+        # Required fields
+        job_number = data.get('jobNumber')
+        email_content = data.get('emailContent', '')
         
+        if not job_number:
+            return jsonify({'error': 'No job number provided'}), 400
+        
+        if not email_content:
+            return jsonify({'error': 'No email content provided'}), 400
+        
+        # Get project details from Airtable
+        project = get_project_from_airtable(job_number)
+        
+        if not project:
+            return jsonify({
+                'error': 'job_not_found',
+                'jobNumber': job_number,
+                'message': f"Could not find job {job_number} in the system"
+            }), 404
+        
+        # Build content for Claude
+        update_content = f"""Job Number: {job_number}
+Client Name: {project['clientName']}
+Current Stage: {project['stage']}
+Email/Message Content:
+{email_content}"""
+        
+        # Call Claude with Update prompt
+        response = client.messages.create(
+            model='claude-sonnet-4-20250514',
+            max_tokens=1500,
+            temperature=0.2,
+            system=UPDATE_PROMPT,
+            messages=[
+                {'role': 'user', 'content': update_content}
+            ]
+        )
+        
+        # Parse Claude's JSON response
+        content = response.content[0].text
+        content = strip_markdown_json(content)
+        analysis = json.loads(content)
+        
+        # Check for errors from Claude
+        if analysis.get('error'):
+            return jsonify(analysis), 400
+        
+        # Update Airtable with the changes
+        if analysis.get('projectUpdates'):
+            update_success = update_project_in_airtable(
+                job_number, 
+                analysis['projectUpdates']
+            )
+            analysis['airtableUpdated'] = update_success
+        
+        # Add project context to response
+        analysis['teamsChannelId'] = project['teamsChannelId']
+        analysis['projectRecordId'] = project['recordId']
+        
+        return jsonify(analysis)
+        
+    except json.JSONDecodeError as e:
+        return jsonify({
+            'error': 'Claude returned invalid JSON',
+            'details': str(e),
+            'raw_response': content
+        }), 500
     except Exception as e:
         return jsonify({
             'error': 'Internal server error',
@@ -297,13 +528,11 @@ def health():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'service': 'Dot Traffic Hub',
+        'service': 'Dot Main',
         'endpoints': ['/traffic', '/triage', '/update', '/health']
     })
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
